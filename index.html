@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipment Maintenance Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a18; min-height: 100vh; }
+
+  .topbar { background: #fff; border-bottom: 1px solid #e0dfd8; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 50; }
+  .topbar-brand { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar-sub { font-size: 12px; color: #888780; margin-top: 1px; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #d3d1c7; background: #fff; color: #1a1a18; font-size: 13px; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+  .btn:hover { background: #f1efe8; }
+  .btn.primary { background: #1a1a18; color: #fff; border-color: #1a1a18; }
+  .btn.primary:hover { background: #333; }
+  .btn.danger { color: #a32d2d; border-color: #f7c1c1; }
+  .btn.danger:hover { background: #fcebeb; }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 22px; font-weight: 600; }
+  .header-sub { font-size: 13px; color: #888780; margin-top: 3px; }
+
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid #e0dfd8; margin-bottom: 1.5rem; }
+  .tab { padding: 9px 18px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: #888780; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; transition: color 0.15s; margin-bottom: -1px; }
+  .tab.active { color: #1a1a18; border-bottom-color: #1a1a18; font-weight: 500; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  .stat-card { background: #fff; border: 1px solid #e0dfd8; border-radius: 10px; padding: 14px 16px; }
+  .stat-label { font-size: 11px; color: #888780; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .stat-val { font-size: 24px; font-weight: 600; }
+  .stat-val.danger { color: #a32d2d; }
+  .stat-val.warning { color: #854f0b; }
+  .stat-val.info { color: #185fa5; }
+  .stat-val.success { color: #3b6d11; }
+
+  .search-bar { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .search-input { flex: 1; min-width: 180px; padding: 9px 12px; border: 1px solid #d3d1c7; border-radius: 8px; font-size: 13px; font-family: inherit; background: #fff; color: #1a1a18; }
+  .search-input:focus { outline: none; border-color: #888780; }
+  .filter-select { padding: 9px 10px; border: 1px solid #d3d1c7; border-radius: 8px; font-size: 13px; font-family: inherit; background: #fff; color: #1a1a18; cursor: pointer; }
+
+  .equipment-grid { display: flex; flex-direction: column; gap: 10px; }
+  .eq-card { background: #fff; border: 1px solid #e0dfd8; border-radius: 12px; padding: 1rem 1.25rem; transition: border-color 0.15s; }
+  .eq-card:hover { border-color: #b4b2a9; }
+  .eq-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .eq-name { font-size: 15px; font-weight: 600; }
+  .eq-location { font-size: 12px; color: #888780; margin-top: 2px; }
+  .eq-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.open { background: #fcebeb; color: #a32d2d; }
+  .badge.in-progress { background: #faeeda; color: #854f0b; }
+  .badge.completed { background: #eaf3de; color: #3b6d11; }
+  .badge.scheduled { background: #e6f1fb; color: #185fa5; }
+
+  .eq-card-detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f1efe8; display: none; }
+  .eq-card-detail.open { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-bottom: 14px; }
+  .detail-row { display: flex; flex-direction: column; gap: 3px; }
+  .detail-label { font-size: 11px; color: #888780; text-transform: uppercase; letter-spacing: 0.04em; }
+  .detail-val { font-size: 13px; color: #1a1a18; }
+
+  .history-section-title { font-size: 11px; color: #888780; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .history-item { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid #f1efe8; font-size: 12px; color: #5f5e5a; }
+  .history-item:last-child { border-bottom: none; }
+  .history-date { min-width: 90px; color: #b4b2a9; font-size: 11px; }
+  .card-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; border: 1px solid #e0dfd8; padding: 1.75rem; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+  .modal h2 { font-size: 17px; font-weight: 600; margin-bottom: 1.25rem; }
+  .form-group { margin-bottom: 12px; }
+  .form-label { font-size: 12px; color: #5f5e5a; margin-bottom: 5px; display: block; font-weight: 500; }
+  .form-input { width: 100%; padding: 9px 11px; border: 1px solid #d3d1c7; border-radius: 8px; font-size: 13px; font-family: inherit; color: #1a1a18; background: #fff; }
+  .form-input:focus { outline: none; border-color: #888780; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 1.5rem; justify-content: flex-end; }
+
+  .qr-modal-inner { text-align: center; }
+  .qr-modal-inner h2 { margin-bottom: 4px; }
+  .qr-subtitle { font-size: 12px; color: #888780; margin-bottom: 1.25rem; }
+  #qr-canvas { border: 1px solid #e0dfd8; border-radius: 10px; display: block; margin: 0 auto; }
+  .qr-url { font-size: 11px; color: #b4b2a9; margin-top: 10px; word-break: break-all; }
+  .qr-instructions { background: #f5f5f3; border-radius: 8px; padding: 12px 14px; margin-top: 14px; text-align: left; font-size: 12px; color: #5f5e5a; line-height: 1.6; }
+
+  .mobile-preview-wrap { background: #f1efe8; border-radius: 14px; padding: 2rem; }
+  .mobile-preview-title { text-align: center; font-size: 13px; color: #888780; margin-bottom: 1.25rem; }
+  .phone-select { text-align: center; margin-bottom: 1rem; }
+  .phone-frame { background: #fff; border: 2px solid #d3d1c7; border-radius: 28px; padding: 24px 18px; max-width: 340px; margin: 0 auto; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .phone-notch { width: 80px; height: 8px; background: #d3d1c7; border-radius: 4px; margin: 0 auto 18px; }
+  .phone-logo { font-size: 10px; color: #b4b2a9; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 12px; }
+  .phone-eq-name { font-size: 19px; font-weight: 700; text-align: center; color: #1a1a18; }
+  .phone-eq-loc { font-size: 12px; color: #888780; text-align: center; margin-top: 3px; margin-bottom: 14px; }
+  .phone-status-banner { border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .phone-status-banner.open { background: #fcebeb; }
+  .phone-status-banner.in-progress { background: #faeeda; }
+  .phone-status-banner.scheduled { background: #e6f1fb; }
+  .phone-status-banner.completed { background: #eaf3de; }
+  .phone-status-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: #888780; }
+  .phone-status-text { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .phone-status-text.open { color: #a32d2d; }
+  .phone-status-text.in-progress { color: #633806; }
+  .phone-status-text.scheduled { color: #185fa5; }
+  .phone-status-text.completed { color: #3b6d11; }
+  .phone-detail-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #f1efe8; font-size: 12px; gap: 8px; }
+  .phone-detail-row:last-child { border-bottom: none; }
+  .phone-detail-key { color: #888780; flex-shrink: 0; }
+  .phone-detail-val { color: #1a1a18; font-weight: 500; text-align: right; }
+  .phone-history-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: #888780; margin: 14px 0 8px; }
+  .phone-hist-item { font-size: 11px; color: #5f5e5a; padding: 5px 0; border-bottom: 1px solid #f1efe8; }
+  .phone-hist-item:last-child { border-bottom: none; }
+  .phone-hist-date { color: #b4b2a9; font-size: 10px; display: block; }
+
+  .add-hist-form { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .add-hist-form input { width: 100%; padding: 7px 10px; border: 1px solid #d3d1c7; border-radius: 6px; font-size: 12px; font-family: inherit; margin-bottom: 6px; }
+  .empty-state { text-align: center; padding: 3rem 1rem; color: #888780; font-size: 14px; }
+
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .container { padding: 1rem; }
+    .topbar { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-brand">Property Maintenance</div>
+    <div class="topbar-sub">Equipment Tracker</div>
+  </div>
+  <button class="btn primary" onclick="openAddModal()">+ Add Equipment</button>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('equipment')" id="tab-equipment">All Equipment</button>
+    <button class="tab" onclick="switchTab('preview')" id="tab-preview">Mobile Preview</button>
+  </div>
+
+  <div id="view-equipment">
+    <div class="stats" id="stats"></div>
+    <div class="search-bar">
+      <input class="search-input" type="text" placeholder="Search by name, location, or technician..." id="search" oninput="renderList()">
+      <select class="filter-select" id="filter-status" onchange="renderList()">
+        <option value="">All statuses</option>
+        <option value="open">Open</option>
+        <option value="in-progress">In Progress</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+    <div class="equipment-grid" id="equipment-list"></div>
+  </div>
+
+  <div id="view-preview" style="display:none;">
+    <div class="mobile-preview-wrap">
+      <div class="mobile-preview-title">Staff see this page when they scan a QR code on their phone</div>
+      <div class="phone-select">
+        <select class="filter-select" id="preview-select" onchange="renderPhone()">
+          <option value="">Select equipment to preview...</option>
+        </select>
+      </div>
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div id="phone-preview"><div class="empty-state">Select an equipment item above to preview the mobile view.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-bg" id="add-modal">
+  <div class="modal">
+    <h2 id="modal-title">Add Equipment</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Equipment name *</label>
+        <input class="form-input" id="f-name" placeholder="e.g. HVAC Unit #3">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location *</label>
+        <input class="form-input" id="f-location" placeholder="e.g. Building A, Roof">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Manufacturer</label>
+        <input class="form-input" id="f-manufacturer" placeholder="e.g. Carrier">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Model number</label>
+        <input class="form-input" id="f-model" placeholder="e.g. 50XC-060">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Serial number</label>
+      <input class="form-input" id="f-serial" placeholder="e.g. SN-2024-98321">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-input" id="f-status">
+          <option value="open">Open</option>
+          <option value="in-progress">In Progress</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select class="form-input" id="f-priority">
+          <option value="Emergency">Emergency</option>
+          <option value="High">High</option>
+          <option value="Routine" selected>Routine</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Assigned technician</label>
+        <input class="form-input" id="f-tech" placeholder="e.g. Mike Torres">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Est. completion date</label>
+        <input class="form-input" type="date" id="f-date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Issue description</label>
+      <input class="form-input" id="f-issue" placeholder="Brief description of the issue">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn primary" onclick="saveEquipment()">Save Equipment</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal-bg" id="qr-modal">
+  <div class="modal">
+    <div class="qr-modal-inner">
+      <h2 id="qr-title">QR Code</h2>
+      <p class="qr-subtitle" id="qr-subtitle"></p>
+      <canvas id="qr-canvas" width="220" height="220"></canvas>
+      <p class="qr-url" id="qr-url"></p>
+      <div class="qr-instructions">
+        <strong>How to use:</strong> Print this QR code and affix it to the equipment. Maintenance staff scan it with their phone camera to instantly view the current status, assigned technician, and repair history.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="downloadQR()">Download PNG</button>
+      <button class="btn" onclick="closeModal('qr-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add History Modal -->
+<div class="modal-bg" id="hist-modal">
+  <div class="modal">
+    <h2>Add History Note</h2>
+    <div class="form-group">
+      <label class="form-label">Note</label>
+      <input class="form-input" id="hist-note" placeholder="e.g. Technician inspected — parts ordered">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('hist-modal')">Cancel</button>
+      <button class="btn primary" onclick="saveHistory()">Add Note</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let equipment = [
+  { id: 'eq-001', name: 'HVAC Unit #1', location: 'Building A, Roof', manufacturer: 'Carrier', model: '50XC-060', serial: 'SN-2022-44210', status: 'in-progress', priority: 'High', tech: 'Mike Torres', estDate: '2026-03-28', issue: 'Compressor making loud noise, coolant may be low', history: [{ date: '2026-03-15', note: 'Issue reported by tenant' }, { date: '2026-03-18', note: 'Technician inspected — ordered replacement parts' }, { date: '2026-03-20', note: 'Parts arrived, repair scheduled' }] },
+  { id: 'eq-002', name: 'Elevator B', location: 'Building B, Main Lobby', manufacturer: 'Otis', model: 'Gen2-MRL', serial: 'SN-2019-77043', status: 'scheduled', priority: 'Routine', tech: 'Ana Rivera', estDate: '2026-04-02', issue: 'Annual inspection and lubrication service', history: [{ date: '2026-03-10', note: 'Routine maintenance scheduled per annual plan' }] },
+  { id: 'eq-003', name: 'Boiler Unit #2', location: 'Building C, Basement', manufacturer: 'Weil-McLain', model: 'GV90+', serial: 'SN-2020-11823', status: 'open', priority: 'Emergency', tech: 'Unassigned', estDate: '', issue: 'No heat in units 301-315, boiler not firing', history: [{ date: '2026-03-22', note: 'Emergency reported — tenants without heat' }] },
+  { id: 'eq-004', name: 'Pool Pump', location: 'Building D, Pool Area', manufacturer: 'Pentair', model: 'SuperFlo VS', serial: 'SN-2021-55609', status: 'completed', priority: 'Routine', tech: 'James Lee', estDate: '2026-03-10', issue: 'Seal replacement and filter cleaning', history: [{ date: '2026-03-05', note: 'Leak reported at pump housing' }, { date: '2026-03-08', note: 'Parts ordered' }, { date: '2026-03-10', note: 'Repair completed — tested and operational' }] }
+];
+
+let editId = null;
+let histTargetId = null;
+
+function statusLabel(s) {
+  return { open: 'Open', 'in-progress': 'In Progress', scheduled: 'Scheduled', completed: 'Completed' }[s] || s;
+}
+
+function switchTab(tab) {
+  document.getElementById('view-equipment').style.display = tab === 'equipment' ? 'block' : 'none';
+  document.getElementById('view-preview').style.display = tab === 'preview' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'preview') populatePreviewSelect();
+}
+
+function renderStats() {
+  const c = { open: 0, 'in-progress': 0, scheduled: 0, completed: 0 };
+  equipment.forEach(e => { if (c[e.status] !== undefined) c[e.status]++; });
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Open</div><div class="stat-val danger">${c.open}</div></div>
+    <div class="stat-card"><div class="stat-label">In Progress</div><div class="stat-val warning">${c['in-progress']}</div></div>
+    <div class="stat-card"><div class="stat-label">Scheduled</div><div class="stat-val info">${c.scheduled}</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-val success">${c.completed}</div></div>
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-val">${equipment.length}</div></div>
+  `;
+}
+
+function renderList() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const fs = document.getElementById('filter-status').value;
+  const filtered = equipment.filter(e =>
+    (!q || e.name.toLowerCase().includes(q) || e.location.toLowerCase().includes(q) || (e.tech || '').toLowerCase().includes(q)) &&
+    (!fs || e.status === fs)
+  );
+  if (!filtered.length) {
+    document.getElementById('equipment-list').innerHTML = '<div class="empty-state">No equipment found matching your search.</div>';
+    return;
+  }
+  document.getElementById('equipment-list').innerHTML = filtered.map(e => `
+    <div class="eq-card" id="card-${e.id}">
+      <div class="eq-card-top">
+        <div>
+          <div class="eq-name">${e.name}</div>
+          <div class="eq-location">${e.location}</div>
+        </div>
+        <div class="eq-meta">
+          <span class="badge ${e.status}">${statusLabel(e.status)}</span>
+          <span style="font-size:11px;color:#888780;font-weight:500;">${e.priority}</span>
+          <button class="btn sm" onclick="toggleDetail('${e.id}')">Details ▾</button>
+        </div>
+      </div>
+      <div class="eq-card-detail" id="detail-${e.id}">
+        <div class="detail-grid">
+          <div class="detail-row"><span class="detail-label">Manufacturer</span><span class="detail-val">${e.manufacturer || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Model number</span><span class="detail-val">${e.model || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Serial number</span><span class="detail-val">${e.serial || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Assigned technician</span><span class="detail-val">${e.tech || 'Unassigned'}</span></div>
+          <div class="detail-row"><span class="detail-label">Est. completion</span><span class="detail-val">${e.estDate || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Priority</span><span class="detail-val">${e.priority}</span></div>
+          <div class="detail-row" style="grid-column:1/-1;"><span class="detail-label">Issue description</span><span class="detail-val">${e.issue || '—'}</span></div>
+        </div>
+        <div class="history-section-title">Repair history</div>
+        <div>
+          ${e.history.slice().reverse().map(h => `<div class="history-item"><span class="history-date">${h.date}</span><span>${h.note}</span></div>`).join('') || '<div style="font-size:12px;color:#b4b2a9;padding:6px 0;">No history yet.</div>'}
+        </div>
+        <div class="card-actions">
+          <button class="btn sm" onclick="showQR('${e.id}')">Show QR Code</button>
+          <button class="btn sm" onclick="openAddHistModal('${e.id}')">+ Add Note</button>
+          <button class="btn sm" onclick="openEditModal('${e.id}')">Edit</button>
+          <button class="btn sm" onclick="previewEquipment('${e.id}')">Preview Mobile</button>
+          <button class="btn sm danger" onclick="deleteEq('${e.id}')">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleDetail(id) {
+  document.getElementById('detail-' + id).classList.toggle('open');
+}
+
+function showQR(id) {
+  const eq = equipment.find(e => e.id === id);
+  if (!eq) return;
+  const url = window.location.href.split('?')[0] + '?eq=' + eq.id;
+  document.getElementById('qr-title').textContent = eq.name;
+  document.getElementById('qr-subtitle').textContent = eq.location;
+  document.getElementById('qr-url').textContent = url;
+
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 220, 220);
+
+  if (window.QRCode) {
+    const tmp = document.createElement('div');
+    tmp.style.display = 'none';
+    document.body.appendChild(tmp);
+    new QRCode(tmp, { text: url, width: 200, height: 200, colorDark: '#1a1a18', colorLight: '#ffffff' });
+    setTimeout(() => {
+      const img = tmp.querySelector('img');
+      if (img) {
+        const i = new Image();
+        i.onload = () => { ctx.fillStyle = '#fff'; ctx.fillRect(0,0,220,220); ctx.drawImage(i, 10, 10, 200, 200); };
+        i.src = img.src;
+      }
+      document.body.removeChild(tmp);
+    }, 150);
+  }
+  document.getElementById('qr-modal').classList.add('open');
+}
+
+function downloadQR() {
+  const canvas = document.getElementById('qr-canvas');
+  const link = document.createElement('a');
+  const eq = equipment.find(e => e.name === document.getElementById('qr-title').textContent);
+  link.download = (eq ? eq.id : 'equipment') + '-qr-code.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function openAddModal() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Add Equipment';
+  ['name','location','manufacturer','model','serial','tech','issue'].forEach(f => document.getElementById('f-'+f).value = '');
+  document.getElementById('f-status').value = 'open';
+  document.getElementById('f-priority').value = 'Routine';
+  document.getElementById('f-date').value = '';
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const eq = equipment.find(e => e.id === id);
+  if (!eq) return;
+  editId = id;
+  document.getElementById('modal-title').textContent = 'Edit Equipment';
+  document.getElementById('f-name').value = eq.name;
+  document.getElementById('f-location').value = eq.location;
+  document.getElementById('f-manufacturer').value = eq.manufacturer || '';
+  document.getElementById('f-model').value = eq.model || '';
+  document.getElementById('f-serial').value = eq.serial || '';
+  document.getElementById('f-status').value = eq.status;
+  document.getElementById('f-priority').value = eq.priority;
+  document.getElementById('f-tech').value = eq.tech || '';
+  document.getElementById('f-date').value = eq.estDate || '';
+  document.getElementById('f-issue').value = eq.issue || '';
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function saveEquipment() {
+  const name = document.getElementById('f-name').value.trim();
+  const location = document.getElementById('f-location').value.trim();
+  if (!name) { alert('Equipment name is required.'); return; }
+  if (!location) { alert('Location is required.'); return; }
+  const data = {
+    name, location,
+    manufacturer: document.getElementById('f-manufacturer').value.trim(),
+    model: document.getElementById('f-model').value.trim(),
+    serial: document.getElementById('f-serial').value.trim(),
+    status: document.getElementById('f-status').value,
+    priority: document.getElementById('f-priority').value,
+    tech: document.getElementById('f-tech').value.trim(),
+    estDate: document.getElementById('f-date').value,
+    issue: document.getElementById('f-issue').value.trim()
+  };
+  if (editId) {
+    const eq = equipment.find(e => e.id === editId);
+    Object.assign(eq, data);
+    eq.history.push({ date: today(), note: 'Record updated by manager' });
+  } else {
+    const id = 'eq-' + Date.now();
+    equipment.push({ ...data, id, history: [{ date: today(), note: 'Equipment added to system' }] });
+  }
+  closeModal('add-modal');
+  render();
+}
+
+function openAddHistModal(id) {
+  histTargetId = id;
+  document.getElementById('hist-note').value = '';
+  document.getElementById('hist-modal').classList.add('open');
+}
+
+function saveHistory() {
+  const note = document.getElementById('hist-note').value.trim();
+  if (!note) { alert('Please enter a note.'); return; }
+  const eq = equipment.find(e => e.id === histTargetId);
+  if (eq) { eq.history.push({ date: today(), note }); }
+  closeModal('hist-modal');
+  render();
+}
+
+function deleteEq(id) {
+  if (!confirm('Delete this equipment record? This cannot be undone.')) return;
+  equipment = equipment.filter(e => e.id !== id);
+  render();
+}
+
+function previewEquipment(id) {
+  switchTab('preview');
+  setTimeout(() => {
+    document.getElementById('preview-select').value = id;
+    renderPhone();
+  }, 50);
+}
+
+function populatePreviewSelect() {
+  const sel = document.getElementById('preview-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select equipment to preview...</option>' +
+    equipment.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+function renderPhone() {
+  const id = document.getElementById('preview-select').value;
+  const eq = equipment.find(e => e.id === id);
+  if (!eq) { document.getElementById('phone-preview').innerHTML = '<div class="empty-state">Select an equipment item above.</div>'; return; }
+  document.getElementById('phone-preview').innerHTML = `
+    <div class="phone-logo">Property Maintenance System</div>
+    <div class="phone-eq-name">${eq.name}</div>
+    <div class="phone-eq-loc">${eq.location}</div>
+    <div class="phone-status-banner ${eq.status}">
+      <div class="phone-status-label">Current status</div>
+      <div class="phone-status-text ${eq.status}">${statusLabel(eq.status)} &mdash; ${eq.priority} Priority</div>
+    </div>
+    ${[
+      ['Assigned technician', eq.tech || 'Unassigned'],
+      ['Est. completion', eq.estDate || '—'],
+      ['Manufacturer', eq.manufacturer || '—'],
+      ['Model number', eq.model || '—'],
+      ['Serial number', eq.serial || '—'],
+      ['Issue', eq.issue || '—']
+    ].map(([k,v]) => `<div class="phone-detail-row"><span class="phone-detail-key">${k}</span><span class="phone-detail-val">${v}</span></div>`).join('')}
+    <div class="phone-history-title">Repair history</div>
+    ${eq.history.slice().reverse().map(h => `<div class="phone-hist-item"><span class="phone-hist-date">${h.date}</span>${h.note}</div>`).join('')}
+  `;
+}
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+function checkQRParam() {
+  const params = new URLSearchParams(window.location.search);
+  const eqId = params.get('eq');
+  if (eqId) {
+    const eq = equipment.find(e => e.id === eqId);
+    if (eq) {
+      document.body.innerHTML = '';
+      document.body.style.background = '#f5f5f3';
+      document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      const wrap = document.createElement('div');
+      wrap.style = 'max-width:400px;margin:2rem auto;padding:1rem;';
+      wrap.innerHTML = `
+        <div style="text-align:center;margin-bottom:1rem;">
+          <div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Property Maintenance System</div>
+          <div style="font-size:22px;font-weight:700;color:#1a1a18;">${eq.name}</div>
+          <div style="font-size:13px;color:#888780;margin-top:4px;">${eq.location}</div>
+        </div>
+        <div style="background:${eq.status==='open'?'#fcebeb':eq.status==='in-progress'?'#faeeda':eq.status==='scheduled'?'#e6f1fb':'#eaf3de'};border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#888780;">Current status</div>
+          <div style="font-size:16px;font-weight:700;color:${eq.status==='open'?'#a32d2d':eq.status==='in-progress'?'#633806':eq.status==='scheduled'?'#185fa5':'#3b6d11'};margin-top:4px;">${statusLabel(eq.status)} &mdash; ${eq.priority} Priority</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:16px;margin-bottom:16px;">
+          ${[['Assigned technician',eq.tech||'Unassigned'],['Est. completion',eq.estDate||'—'],['Manufacturer',eq.manufacturer||'—'],['Model',eq.model||'—'],['Serial number',eq.serial||'—'],['Issue',eq.issue||'—']].map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1efe8;font-size:13px;gap:8px;"><span style="color:#888780;">${k}</span><span style="font-weight:600;text-align:right;">${v}</span></div>`).join('')}
+        </div>
+        <div style="background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:16px;">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#888780;margin-bottom:10px;">Repair history</div>
+          ${eq.history.slice().reverse().map(h=>`<div style="font-size:12px;color:#5f5e5a;padding:6px 0;border-bottom:1px solid #f1efe8;"><span style="font-size:11px;color:#b4b2a9;display:block;">${h.date}</span>${h.note}</div>`).join('')}
+        </div>
+      `;
+      document.body.appendChild(wrap);
+      return;
+    }
+  }
+  render();
+}
+
+function render() { renderStats(); renderList(); }
+checkQRParam();
+</script>
+</body>
+</html>
