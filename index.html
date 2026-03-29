@@ -12,6 +12,10 @@
   .topbar { background: #fff; border-bottom: 1px solid #e0dfd8; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 50; }
   .topbar-brand { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
   .topbar-sub { font-size: 12px; color: #888780; margin-top: 1px; }
+  .topbar-status { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+  .topbar-status.connected { background: #eaf3de; color: #3b6d11; }
+  .topbar-status.disconnected { background: #fcebeb; color: #a32d2d; }
+  .topbar-status.loading { background: #faeeda; color: #854f0b; }
 
   .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 
@@ -22,10 +26,7 @@
   .btn.danger { color: #a32d2d; border-color: #f7c1c1; }
   .btn.danger:hover { background: #fcebeb; }
   .btn.sm { padding: 5px 10px; font-size: 12px; }
-
-  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
-  .header h1 { font-size: 22px; font-weight: 600; }
-  .header-sub { font-size: 13px; color: #888780; margin-top: 3px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid #e0dfd8; margin-bottom: 1.5rem; }
   .tab { padding: 9px 18px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: #888780; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; transition: color 0.15s; margin-bottom: -1px; }
@@ -118,9 +119,13 @@
   .phone-hist-item:last-child { border-bottom: none; }
   .phone-hist-date { color: #b4b2a9; font-size: 10px; display: block; }
 
-  .add-hist-form { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
-  .add-hist-form input { width: 100%; padding: 7px 10px; border: 1px solid #d3d1c7; border-radius: 6px; font-size: 12px; font-family: inherit; margin-bottom: 6px; }
+  .loading-overlay { text-align: center; padding: 3rem 1rem; color: #888780; font-size: 14px; }
+  .spinner { width: 28px; height: 28px; border: 2px solid #e0dfd8; border-top-color: #1a1a18; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .empty-state { text-align: center; padding: 3rem 1rem; color: #888780; font-size: 14px; }
+  .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: #1a1a18; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .toast.error { background: #a32d2d; }
 
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
@@ -137,7 +142,10 @@
     <div class="topbar-brand">Property Maintenance</div>
     <div class="topbar-sub">Equipment Tracker</div>
   </div>
-  <button class="btn primary" onclick="openAddModal()">+ Add Equipment</button>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span class="topbar-status loading" id="db-status">Connecting...</span>
+    <button class="btn primary" onclick="openAddModal()">+ Add Equipment</button>
+  </div>
 </div>
 
 <div class="container">
@@ -158,7 +166,9 @@
         <option value="completed">Completed</option>
       </select>
     </div>
-    <div class="equipment-grid" id="equipment-list"></div>
+    <div class="equipment-grid" id="equipment-list">
+      <div class="loading-overlay"><div class="spinner"></div>Loading equipment from database...</div>
+    </div>
   </div>
 
   <div id="view-preview" style="display:none;">
@@ -240,7 +250,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('add-modal')">Cancel</button>
-      <button class="btn primary" onclick="saveEquipment()">Save Equipment</button>
+      <button class="btn primary" id="save-btn" onclick="saveEquipment()">Save Equipment</button>
     </div>
   </div>
 </div>
@@ -254,7 +264,7 @@
       <canvas id="qr-canvas" width="220" height="220"></canvas>
       <p class="qr-url" id="qr-url"></p>
       <div class="qr-instructions">
-        <strong>How to use:</strong> Print this QR code and affix it to the equipment. Maintenance staff scan it with their phone camera to instantly view the current status, assigned technician, and repair history.
+        <strong>How to use:</strong> Print this QR code and affix it to the equipment. Maintenance staff scan it with their phone camera to instantly view the current status, assigned technician, and repair history — live from the database.
       </div>
     </div>
     <div class="modal-actions">
@@ -279,16 +289,47 @@
   </div>
 </div>
 
-<script>
-let equipment = [
-  { id: 'eq-001', name: 'HVAC Unit #1', location: 'Building A, Roof', manufacturer: 'Carrier', model: '50XC-060', serial: 'SN-2022-44210', status: 'in-progress', priority: 'High', tech: 'Mike Torres', estDate: '2026-03-28', issue: 'Compressor making loud noise, coolant may be low', history: [{ date: '2026-03-15', note: 'Issue reported by tenant' }, { date: '2026-03-18', note: 'Technician inspected — ordered replacement parts' }, { date: '2026-03-20', note: 'Parts arrived, repair scheduled' }] },
-  { id: 'eq-002', name: 'Elevator B', location: 'Building B, Main Lobby', manufacturer: 'Otis', model: 'Gen2-MRL', serial: 'SN-2019-77043', status: 'scheduled', priority: 'Routine', tech: 'Ana Rivera', estDate: '2026-04-02', issue: 'Annual inspection and lubrication service', history: [{ date: '2026-03-10', note: 'Routine maintenance scheduled per annual plan' }] },
-  { id: 'eq-003', name: 'Boiler Unit #2', location: 'Building C, Basement', manufacturer: 'Weil-McLain', model: 'GV90+', serial: 'SN-2020-11823', status: 'open', priority: 'Emergency', tech: 'Unassigned', estDate: '', issue: 'No heat in units 301-315, boiler not firing', history: [{ date: '2026-03-22', note: 'Emergency reported — tenants without heat' }] },
-  { id: 'eq-004', name: 'Pool Pump', location: 'Building D, Pool Area', manufacturer: 'Pentair', model: 'SuperFlo VS', serial: 'SN-2021-55609', status: 'completed', priority: 'Routine', tech: 'James Lee', estDate: '2026-03-10', issue: 'Seal replacement and filter cleaning', history: [{ date: '2026-03-05', note: 'Leak reported at pump housing' }, { date: '2026-03-08', note: 'Parts ordered' }, { date: '2026-03-10', note: 'Repair completed — tested and operational' }] }
-];
+<div class="toast" id="toast"></div>
 
+<script>
+const SUPABASE_URL = 'https://joijxyxvedgqlcmhmlod.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvaWp4eXh2ZWRncWxjbWhtbG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NDE1NjMsImV4cCI6MjA5MDMxNzU2M30.DEYrO2LwOYX6YaIxP2eYyvEVzIkD4Rx2uB6-Nf2WCEM';
+const HEADERS = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+
+let equipment = [];
 let editId = null;
 let histTargetId = null;
+
+async function api(method, path, body) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    method, headers: { ...HEADERS, 'Prefer': method === 'POST' ? 'return=representation' : 'return=representation' }, body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  return res.status === 204 ? null : res.json();
+}
+
+async function loadEquipment() {
+  try {
+    const rows = await api('GET', 'equipment?order=created_at.desc');
+    equipment = rows.map(r => ({
+      id: r.id, name: r.name, location: r.location, manufacturer: r.manufacturer,
+      model: r.model, serial: r.serial, status: r.status, priority: r.priority,
+      tech: r.tech, estDate: r.est_date, issue: r.issue, history: r.history || []
+    }));
+    setDbStatus('connected');
+    render();
+  } catch(e) {
+    setDbStatus('disconnected');
+    showToast('Could not connect to database. Check your Supabase settings.', true);
+    document.getElementById('equipment-list').innerHTML = '<div class="empty-state">Could not load equipment. Please check your database connection.</div>';
+  }
+}
+
+function setDbStatus(s) {
+  const el = document.getElementById('db-status');
+  el.className = 'topbar-status ' + s;
+  el.textContent = s === 'connected' ? 'Database connected' : s === 'disconnected' ? 'Not connected' : 'Connecting...';
+}
 
 function statusLabel(s) {
   return { open: 'Open', 'in-progress': 'In Progress', scheduled: 'Scheduled', completed: 'Completed' }[s] || s;
@@ -318,11 +359,11 @@ function renderList() {
   const q = document.getElementById('search').value.toLowerCase();
   const fs = document.getElementById('filter-status').value;
   const filtered = equipment.filter(e =>
-    (!q || e.name.toLowerCase().includes(q) || e.location.toLowerCase().includes(q) || (e.tech || '').toLowerCase().includes(q)) &&
+    (!q || e.name.toLowerCase().includes(q) || (e.location||'').toLowerCase().includes(q) || (e.tech||'').toLowerCase().includes(q)) &&
     (!fs || e.status === fs)
   );
   if (!filtered.length) {
-    document.getElementById('equipment-list').innerHTML = '<div class="empty-state">No equipment found matching your search.</div>';
+    document.getElementById('equipment-list').innerHTML = '<div class="empty-state">No equipment found. Add your first item using the button above.</div>';
     return;
   }
   document.getElementById('equipment-list').innerHTML = filtered.map(e => `
@@ -330,7 +371,7 @@ function renderList() {
       <div class="eq-card-top">
         <div>
           <div class="eq-name">${e.name}</div>
-          <div class="eq-location">${e.location}</div>
+          <div class="eq-location">${e.location || ''}</div>
         </div>
         <div class="eq-meta">
           <span class="badge ${e.status}">${statusLabel(e.status)}</span>
@@ -375,11 +416,9 @@ function showQR(id) {
   document.getElementById('qr-title').textContent = eq.name;
   document.getElementById('qr-subtitle').textContent = eq.location;
   document.getElementById('qr-url').textContent = url;
-
   const canvas = document.getElementById('qr-canvas');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, 220, 220);
-
   if (window.QRCode) {
     const tmp = document.createElement('div');
     tmp.style.display = 'none';
@@ -401,8 +440,7 @@ function showQR(id) {
 function downloadQR() {
   const canvas = document.getElementById('qr-canvas');
   const link = document.createElement('a');
-  const eq = equipment.find(e => e.name === document.getElementById('qr-title').textContent);
-  link.download = (eq ? eq.id : 'equipment') + '-qr-code.png';
+  link.download = 'equipment-qr-code.png';
   link.href = canvas.toDataURL('image/png');
   link.click();
 }
@@ -423,7 +461,7 @@ function openEditModal(id) {
   editId = id;
   document.getElementById('modal-title').textContent = 'Edit Equipment';
   document.getElementById('f-name').value = eq.name;
-  document.getElementById('f-location').value = eq.location;
+  document.getElementById('f-location').value = eq.location || '';
   document.getElementById('f-manufacturer').value = eq.manufacturer || '';
   document.getElementById('f-model').value = eq.model || '';
   document.getElementById('f-serial').value = eq.serial || '';
@@ -435,32 +473,46 @@ function openEditModal(id) {
   document.getElementById('add-modal').classList.add('open');
 }
 
-function saveEquipment() {
+async function saveEquipment() {
   const name = document.getElementById('f-name').value.trim();
   const location = document.getElementById('f-location').value.trim();
   if (!name) { alert('Equipment name is required.'); return; }
   if (!location) { alert('Location is required.'); return; }
-  const data = {
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  const record = {
     name, location,
-    manufacturer: document.getElementById('f-manufacturer').value.trim(),
-    model: document.getElementById('f-model').value.trim(),
-    serial: document.getElementById('f-serial').value.trim(),
+    manufacturer: document.getElementById('f-manufacturer').value.trim() || null,
+    model: document.getElementById('f-model').value.trim() || null,
+    serial: document.getElementById('f-serial').value.trim() || null,
     status: document.getElementById('f-status').value,
     priority: document.getElementById('f-priority').value,
-    tech: document.getElementById('f-tech').value.trim(),
-    estDate: document.getElementById('f-date').value,
-    issue: document.getElementById('f-issue').value.trim()
+    tech: document.getElementById('f-tech').value.trim() || null,
+    est_date: document.getElementById('f-date').value || null,
+    issue: document.getElementById('f-issue').value.trim() || null,
   };
-  if (editId) {
-    const eq = equipment.find(e => e.id === editId);
-    Object.assign(eq, data);
-    eq.history.push({ date: today(), note: 'Record updated by manager' });
-  } else {
-    const id = 'eq-' + Date.now();
-    equipment.push({ ...data, id, history: [{ date: today(), note: 'Equipment added to system' }] });
+
+  try {
+    if (editId) {
+      const eq = equipment.find(e => e.id === editId);
+      const newHistory = [...(eq.history || []), { date: today(), note: 'Record updated by manager' }];
+      await api('PATCH', `equipment?id=eq.${editId}`, { ...record, history: newHistory });
+      showToast('Equipment updated successfully');
+    } else {
+      record.id = 'eq-' + Date.now();
+      record.history = [{ date: today(), note: 'Equipment added to system' }];
+      await api('POST', 'equipment', record);
+      showToast('Equipment added successfully');
+    }
+    closeModal('add-modal');
+    await loadEquipment();
+  } catch(e) {
+    showToast('Error saving equipment. Please try again.', true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Equipment';
   }
-  closeModal('add-modal');
-  render();
 }
 
 function openAddHistModal(id) {
@@ -469,27 +521,36 @@ function openAddHistModal(id) {
   document.getElementById('hist-modal').classList.add('open');
 }
 
-function saveHistory() {
+async function saveHistory() {
   const note = document.getElementById('hist-note').value.trim();
   if (!note) { alert('Please enter a note.'); return; }
   const eq = equipment.find(e => e.id === histTargetId);
-  if (eq) { eq.history.push({ date: today(), note }); }
-  closeModal('hist-modal');
-  render();
+  if (!eq) return;
+  const newHistory = [...(eq.history || []), { date: today(), note }];
+  try {
+    await api('PATCH', `equipment?id=eq.${histTargetId}`, { history: newHistory });
+    showToast('Note added');
+    closeModal('hist-modal');
+    await loadEquipment();
+  } catch(e) {
+    showToast('Error saving note.', true);
+  }
 }
 
-function deleteEq(id) {
+async function deleteEq(id) {
   if (!confirm('Delete this equipment record? This cannot be undone.')) return;
-  equipment = equipment.filter(e => e.id !== id);
-  render();
+  try {
+    await api('DELETE', `equipment?id=eq.${id}`);
+    showToast('Equipment deleted');
+    await loadEquipment();
+  } catch(e) {
+    showToast('Error deleting equipment.', true);
+  }
 }
 
 function previewEquipment(id) {
   switchTab('preview');
-  setTimeout(() => {
-    document.getElementById('preview-select').value = id;
-    renderPhone();
-  }, 50);
+  setTimeout(() => { document.getElementById('preview-select').value = id; renderPhone(); }, 50);
 }
 
 function populatePreviewSelect() {
@@ -507,21 +568,14 @@ function renderPhone() {
   document.getElementById('phone-preview').innerHTML = `
     <div class="phone-logo">Property Maintenance System</div>
     <div class="phone-eq-name">${eq.name}</div>
-    <div class="phone-eq-loc">${eq.location}</div>
+    <div class="phone-eq-loc">${eq.location || ''}</div>
     <div class="phone-status-banner ${eq.status}">
       <div class="phone-status-label">Current status</div>
       <div class="phone-status-text ${eq.status}">${statusLabel(eq.status)} &mdash; ${eq.priority} Priority</div>
     </div>
-    ${[
-      ['Assigned technician', eq.tech || 'Unassigned'],
-      ['Est. completion', eq.estDate || '—'],
-      ['Manufacturer', eq.manufacturer || '—'],
-      ['Model number', eq.model || '—'],
-      ['Serial number', eq.serial || '—'],
-      ['Issue', eq.issue || '—']
-    ].map(([k,v]) => `<div class="phone-detail-row"><span class="phone-detail-key">${k}</span><span class="phone-detail-val">${v}</span></div>`).join('')}
+    ${[['Assigned technician',eq.tech||'Unassigned'],['Est. completion',eq.estDate||'—'],['Manufacturer',eq.manufacturer||'—'],['Model number',eq.model||'—'],['Serial number',eq.serial||'—'],['Issue',eq.issue||'—']].map(([k,v])=>`<div class="phone-detail-row"><span class="phone-detail-key">${k}</span><span class="phone-detail-val">${v}</span></div>`).join('')}
     <div class="phone-history-title">Repair history</div>
-    ${eq.history.slice().reverse().map(h => `<div class="phone-hist-item"><span class="phone-hist-date">${h.date}</span>${h.note}</div>`).join('')}
+    ${eq.history.slice().reverse().map(h=>`<div class="phone-hist-item"><span class="phone-hist-date">${h.date}</span>${h.note}</div>`).join('')}
   `;
 }
 
@@ -529,40 +583,60 @@ function today() { return new Date().toISOString().split('T')[0]; }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
 
-function checkQRParam() {
+let toastTimer;
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = 'toast', 3000);
+}
+
+async function checkQRParam() {
   const params = new URLSearchParams(window.location.search);
   const eqId = params.get('eq');
   if (eqId) {
-    const eq = equipment.find(e => e.id === eqId);
-    if (eq) {
-      document.body.innerHTML = '';
-      document.body.style.background = '#f5f5f3';
-      document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-      const wrap = document.createElement('div');
-      wrap.style = 'max-width:400px;margin:2rem auto;padding:1rem;';
-      wrap.innerHTML = `
-        <div style="text-align:center;margin-bottom:1rem;">
-          <div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Property Maintenance System</div>
-          <div style="font-size:22px;font-weight:700;color:#1a1a18;">${eq.name}</div>
-          <div style="font-size:13px;color:#888780;margin-top:4px;">${eq.location}</div>
-        </div>
-        <div style="background:${eq.status==='open'?'#fcebeb':eq.status==='in-progress'?'#faeeda':eq.status==='scheduled'?'#e6f1fb':'#eaf3de'};border-radius:10px;padding:14px 16px;margin-bottom:16px;">
-          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#888780;">Current status</div>
-          <div style="font-size:16px;font-weight:700;color:${eq.status==='open'?'#a32d2d':eq.status==='in-progress'?'#633806':eq.status==='scheduled'?'#185fa5':'#3b6d11'};margin-top:4px;">${statusLabel(eq.status)} &mdash; ${eq.priority} Priority</div>
-        </div>
-        <div style="background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:16px;margin-bottom:16px;">
-          ${[['Assigned technician',eq.tech||'Unassigned'],['Est. completion',eq.estDate||'—'],['Manufacturer',eq.manufacturer||'—'],['Model',eq.model||'—'],['Serial number',eq.serial||'—'],['Issue',eq.issue||'—']].map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1efe8;font-size:13px;gap:8px;"><span style="color:#888780;">${k}</span><span style="font-weight:600;text-align:right;">${v}</span></div>`).join('')}
-        </div>
-        <div style="background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:16px;">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#888780;margin-bottom:10px;">Repair history</div>
-          ${eq.history.slice().reverse().map(h=>`<div style="font-size:12px;color:#5f5e5a;padding:6px 0;border-bottom:1px solid #f1efe8;"><span style="font-size:11px;color:#b4b2a9;display:block;">${h.date}</span>${h.note}</div>`).join('')}
-        </div>
-      `;
-      document.body.appendChild(wrap);
-      return;
-    }
+    try {
+      const rows = await api('GET', `equipment?id=eq.${eqId}`);
+      const eq = rows && rows[0] ? {
+        id: rows[0].id, name: rows[0].name, location: rows[0].location,
+        manufacturer: rows[0].manufacturer, model: rows[0].model, serial: rows[0].serial,
+        status: rows[0].status, priority: rows[0].priority, tech: rows[0].tech,
+        estDate: rows[0].est_date, issue: rows[0].issue, history: rows[0].history || []
+      } : null;
+
+      if (eq) {
+        document.body.innerHTML = '';
+        document.body.style.cssText = 'background:#f5f5f3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1a1a18;';
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'max-width:420px;margin:0 auto;padding:1.5rem 1rem 3rem;';
+        const statusColors = { open:'#fcebeb', 'in-progress':'#faeeda', scheduled:'#e6f1fb', completed:'#eaf3de' };
+        const textColors = { open:'#a32d2d', 'in-progress':'#633806', scheduled:'#185fa5', completed:'#3b6d11' };
+        wrap.innerHTML = `
+          <div style="text-align:center;margin-bottom:1.25rem;">
+            <div style="font-size:10px;color:#b4b2a9;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Property Maintenance System</div>
+            <div style="font-size:23px;font-weight:700;">${eq.name}</div>
+            <div style="font-size:13px;color:#888780;margin-top:4px;">${eq.location || ''}</div>
+          </div>
+          <div style="background:${statusColors[eq.status]||'#f1efe8'};border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#888780;">Current status</div>
+            <div style="font-size:16px;font-weight:700;color:${textColors[eq.status]||'#1a1a18'};margin-top:4px;">${statusLabel(eq.status)} &mdash; ${eq.priority} Priority</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:16px;margin-bottom:14px;">
+            ${[['Assigned technician',eq.tech||'Unassigned'],['Est. completion',eq.estDate||'—'],['Manufacturer',eq.manufacturer||'—'],['Model',eq.model||'—'],['Serial number',eq.serial||'—'],['Issue',eq.issue||'—']].map(([k,v])=>`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f1efe8;font-size:13px;gap:8px;"><span style="color:#888780;flex-shrink:0;">${k}</span><span style="font-weight:600;text-align:right;">${v}</span></div>`).join('')}
+          </div>
+          <div style="background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:16px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#888780;margin-bottom:10px;">Repair history</div>
+            ${eq.history.length ? eq.history.slice().reverse().map(h=>`<div style="font-size:12px;color:#5f5e5a;padding:7px 0;border-bottom:1px solid #f1efe8;"><span style="font-size:10px;color:#b4b2a9;display:block;">${h.date}</span>${h.note}</div>`).join('') : '<div style="font-size:12px;color:#b4b2a9;">No history recorded yet.</div>'}
+          </div>
+          <div style="text-align:center;margin-top:1.5rem;font-size:11px;color:#b4b2a9;">Last updated from live database</div>
+        `;
+        document.body.appendChild(wrap);
+        return;
+      }
+    } catch(e) {}
   }
-  render();
+  await loadEquipment();
 }
 
 function render() { renderStats(); renderList(); }
